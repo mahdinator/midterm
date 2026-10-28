@@ -1,0 +1,59 @@
+x-dfs: &dfs
+  build: .
+  image: dfs-node
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: dfs
+      POSTGRES_PASSWORD: dfs
+      POSTGRES_DB: dfs
+    ports: ["5432:5432"]
+    volumes: ["pg-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dfs -d dfs"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  metadata:
+    <<: *dfs
+    hostname: metadata
+    command: ["uvicorn", "dfs.metadata:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      DEAD_AFTER: "15"        # seconds without a heartbeat before a node is declared dead
+    ports: ["8000:8000"]
+
+  node1:
+    <<: *dfs
+    hostname: node1
+    environment: &node-env
+      NODE_ID: node1
+      DATA_DIR: /data
+      METADATA_URL: http://metadata:8000
+      HEARTBEAT_INTERVAL: "5"
+    ports: ["8101:8000"]
+    volumes: ["./data/node1:/data"]
+  node2:
+    <<: *dfs
+    hostname: node2
+    environment: { <<: *node-env, NODE_ID: node2 }
+    ports: ["8102:8000"]
+    volumes: ["./data/node2:/data"]
+  node3:
+    <<: *dfs
+    hostname: node3
+    environment: { <<: *node-env, NODE_ID: node3 }
+    ports: ["8103:8000"]
+    volumes: ["./data/node3:/data"]
+  node4:
+    <<: *dfs
+    hostname: node4
+    environment: { <<: *node-env, NODE_ID: node4 }
+    ports: ["8104:8000"]
+    volumes: ["./data/node4:/data"]
+
+volumes:
+  pg-data:
